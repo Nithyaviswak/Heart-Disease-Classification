@@ -50,10 +50,17 @@ class PyTorchMLP:
         torch.manual_seed(random_state)
         np.random.seed(random_state)
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        try:
+            import torch_directml
+            self.device = torch_directml.device()
+        except ImportError:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            
+        print(f"  PyTorch MLP initialized on device: {self.device}")
         self.model = _MLPNet(input_dim, hidden_layers, dropout_rate).to(self.device)
         self.criterion = nn.BCEWithLogitsLoss()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+        self.pruned = False
 
     def _to_loader(
         self,
@@ -61,12 +68,13 @@ class PyTorchMLP:
         y: np.ndarray,
         batch_size: int,
         shuffle: bool,
+        drop_last: bool = False,
     ) -> DataLoader:
         dataset = TensorDataset(
             torch.tensor(X, dtype=torch.float32),
             torch.tensor(y, dtype=torch.float32).unsqueeze(1),
         )
-        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last)
 
     def train(
         self,
@@ -78,13 +86,18 @@ class PyTorchMLP:
         batch_size: int = 32,
         log_dir: str = "logs/pytorch",
         patience: int = 15,
+        best_score: float = 0.0,
+        s_prev: float = 0.0,
+        k: int = 0,
+        n_folds: int = 1,
     ) -> dict:
         os.makedirs(log_dir, exist_ok=True)
         writer = SummaryWriter(log_dir=log_dir)
+        self.pruned = False
 
-        train_loader = self._to_loader(X_train, y_train, batch_size, shuffle=True)
+        train_loader = self._to_loader(X_train, y_train, batch_size, shuffle=True, drop_last=True)
         val_loader = (
-            self._to_loader(X_val, y_val, batch_size, shuffle=False)
+            self._to_loader(X_val, y_val, batch_size, shuffle=False, drop_last=False)
             if X_val is not None
             else None
         )
@@ -93,6 +106,7 @@ class PyTorchMLP:
         best_state = None
         epochs_no_improve = 0
         best_epoch = 0
+        best_val_acc_this_fold = 0.0
 
         for epoch in range(1, epochs + 1):
             # --- train ---
@@ -130,6 +144,16 @@ class PyTorchMLP:
                 val_acc = val_correct / val_total
                 writer.add_scalar("loss/val", avg_val_loss, epoch)
                 writer.add_scalar("accuracy/val", val_acc, epoch)
+
+                if val_acc > best_val_acc_this_fold:
+                    best_val_acc_this_fold = val_acc
+
+                # Pruning check
+                if best_score > 0 and epoch >= 15:
+                    max_possible = (s_prev + best_val_acc_this_fold + (n_folds - k - 1) * 1.0) / n_folds
+                    if max_possible < best_score:
+                        self.pruned = True
+                        break
 
                 if avg_val_loss < best_val_loss:
                     best_val_loss = avg_val_loss
@@ -171,8 +195,19 @@ class PyTorchMLP:
     def export_onnx(self, path: str = "models/pytorch_mlp.onnx") -> str:
         self.model.eval()
         dummy = torch.randn(1, self.input_dim).to(self.device)
+
+        class ModelWithSigmoid(nn.Module):
+            def __init__(self, model):
+                super().__init__()
+                self.model = model
+            def forward(self, x):
+                return torch.sigmoid(self.model(x))
+
+        wrapped = ModelWithSigmoid(self.model).to(self.device)
+        wrapped.eval()
+
         torch.onnx.export(
-            self.model,
+            wrapped,
             dummy,
             path,
             input_names=["input"],

@@ -6,9 +6,9 @@ Deep learning and classical ML models compared on the UCI Heart Disease dataset.
 
 | Model | Accuracy |
 |-------|----------|
-| Logistic Regression | *(run train.py)* |
-| TensorFlow MLP | *(run train.py)* |
-| PyTorch MLP | *(run train.py)* |
+| Logistic Regression | 0.8033 |
+| TensorFlow MLP | 0.7705 |
+| PyTorch MLP | 0.8197 |
 
 ## Features
 

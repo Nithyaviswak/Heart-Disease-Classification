@@ -35,7 +35,7 @@ def verify_onnx(model_path: str, X_test: np.ndarray, y_test: np.ndarray) -> floa
 
 
 def main() -> None:
-    _, X_test, _, y_test, _, _ = load_heart_disease_data()
+    _, X_test, _, y_test, _, _, _ = load_heart_disease_data()
 
     models = {
         "Logistic Regression": "models/logreg.onnx",

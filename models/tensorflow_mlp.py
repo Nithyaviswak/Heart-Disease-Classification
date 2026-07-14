@@ -7,6 +7,31 @@ from tensorflow import keras
 from keras import layers
 
 
+class TensorFlowPruningCallback(keras.callbacks.Callback):
+    """Callback to stop training early if there is no chance of getting the best accuracy."""
+    def __init__(self, parent, best_score: float, s_prev: float, k: int, n_folds: int, warm_up: int = 15):
+        super().__init__()
+        self.parent = parent
+        self.best_score = best_score
+        self.s_prev = s_prev
+        self.k = k
+        self.n_folds = n_folds
+        self.warm_up = warm_up
+        self.best_val_acc = 0.0
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+        val_acc = logs.get("val_accuracy") or logs.get("val_acc", 0.0)
+        if val_acc > self.best_val_acc:
+            self.best_val_acc = val_acc
+        
+        if epoch + 1 >= self.warm_up:
+            max_possible = (self.s_prev + self.best_val_acc + (self.n_folds - self.k - 1) * 1.0) / self.n_folds
+            if max_possible < self.best_score:
+                self.model.stop_training = True
+                self.parent.pruned = True
+
+
 class TensorFlowMLP:
     """Keras MLP classifier with full training pipeline."""
 
@@ -23,6 +48,7 @@ class TensorFlowMLP:
         self.dropout_rate = dropout_rate
         self.learning_rate = learning_rate
         self.name = "TensorFlow MLP"
+        self.pruned = False
 
         tf.random.set_seed(random_state)
         np.random.seed(random_state)
@@ -55,8 +81,13 @@ class TensorFlowMLP:
         batch_size: int = 32,
         log_dir: str = "logs/tensorflow",
         patience: int = 15,
+        best_score: float = 0.0,
+        s_prev: float = 0.0,
+        k: int = 0,
+        n_folds: int = 1,
     ) -> dict:
         os.makedirs(log_dir, exist_ok=True)
+        self.pruned = False
 
         callbacks = [
             keras.callbacks.EarlyStopping(
@@ -72,6 +103,9 @@ class TensorFlowMLP:
                 write_images=True,
             ),
         ]
+
+        if best_score > 0 and X_val is not None:
+            callbacks.append(TensorFlowPruningCallback(self, best_score, s_prev, k, n_folds))
 
         validation_data = (X_val, y_val) if X_val is not None else None
 
@@ -98,12 +132,36 @@ class TensorFlowMLP:
         return {"accuracy": float(accuracy), "loss": float(loss), "predictions": y_pred}
 
     def export_onnx(self, path: str = "models/tf_mlp.onnx") -> str:
-        import tf2onnx
-        import onnx
+        import subprocess
+        import shutil
 
-        spec = (tf.TensorSpec((None, self.input_dim), tf.float32, name="input"),)
-        output_path = path
-        model_proto, _ = tf2onnx.convert.from_keras(
-            self.model, input_signature=spec, output_path=output_path
-        )
-        return output_path
+        temp_dir = "temp_saved_model"
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+
+        # Export Keras model to SavedModel format (works in Keras 2 and Keras 3)
+        try:
+            if hasattr(self.model, "export"):
+                self.model.export(temp_dir)
+            else:
+                self.model.save(temp_dir, save_format="tf")
+        except Exception:
+            self.model.save(temp_dir, save_format="tf")
+
+        # Run tf2onnx command line tool
+        cmd = [
+            "python", "-m", "tf2onnx.convert",
+            "--saved-model", temp_dir,
+            "--output", path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        # Clean up temporary SavedModel directory
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+
+        if result.returncode != 0:
+            raise RuntimeError(f"tf2onnx conversion failed: {result.stderr or result.stdout}")
+
+        return path

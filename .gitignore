@@ -26,3 +26,5 @@ models/*.json
 .idea/
 .DS_Store
 Thumbs.db
+
+.opencode

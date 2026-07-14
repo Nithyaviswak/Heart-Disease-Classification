@@ -2,6 +2,7 @@
 
 import os
 import json
+import pickle
 import itertools
 import numpy as np
 import pandas as pd
@@ -15,9 +16,9 @@ from models import LogisticRegressionModel, TensorFlowMLP, PyTorchMLP
 # Hyperparameter search space
 # ---------------------------------------------------------------------------
 HP_SPACE = {
-    "hidden_layers": [(128, 64), (256, 128, 64), (64, 32)],
-    "dropout_rate": [0.2, 0.3, 0.5],
-    "learning_rate": [1e-2, 1e-3, 1e-4],
+    "hidden_layers": [(128, 64), (64, 32)],
+    "dropout_rate": [0.2, 0.5],
+    "learning_rate": [1e-3, 1e-4],
 }
 
 
@@ -27,12 +28,12 @@ def grid_search(
     model_cls,
     input_dim: int,
     hp_space: dict,
-    n_folds: int = 3,
-    epochs: int = 100,
+    n_folds: int = 2,
+    epochs: int = 40,
     batch_size: int = 32,
     random_state: int = 42,
 ) -> tuple[dict, float]:
-    """Brute-force grid search with cross-validation. Returns best params and score."""
+    """Grid search with cross-validation."""
     keys = list(hp_space.keys())
     combos = list(itertools.product(*[hp_space[k] for k in keys]))
 
@@ -45,8 +46,16 @@ def grid_search(
     for i, vals in enumerate(combos):
         params = dict(zip(keys, vals))
         fold_scores = []
+        pruned = False
 
-        for train_idx, val_idx in skf.split(X, y):
+        for k, (train_idx, val_idx) in enumerate(skf.split(X, y)):
+            if best_score > 0.0:
+                s_prev = sum(fold_scores)
+                max_possible = (s_prev + (n_folds - k) * 1.0) / n_folds
+                if max_possible < best_score:
+                    pruned = True
+                    break
+
             X_tr, X_vl = X[train_idx], X[val_idx]
             y_tr, y_vl = y[train_idx], y[val_idx]
 
@@ -57,16 +66,30 @@ def grid_search(
                 learning_rate=params["learning_rate"],
                 random_state=random_state,
             )
-            model.train(X_tr, y_tr, X_vl, y_vl, epochs=epochs, batch_size=batch_size)
+            model.train(
+                X_tr, y_tr, X_vl, y_vl,
+                epochs=epochs,
+                batch_size=batch_size,
+                best_score=best_score,
+                s_prev=sum(fold_scores),
+                k=k,
+                n_folds=n_folds,
+            )
+
+            if getattr(model, "pruned", False):
+                pruned = True
+                break
+
             result = model.evaluate(X_vl, y_vl)
             fold_scores.append(result["accuracy"])
 
-        mean_score = float(np.mean(fold_scores))
-        if mean_score > best_score:
-            best_score = mean_score
-            best_params = params
+        if not pruned and len(fold_scores) == n_folds:
+            mean_score = float(np.mean(fold_scores))
+            if mean_score > best_score:
+                best_score = mean_score
+                best_params = params
 
-        if (i + 1) % 5 == 0 or (i + 1) == len(combos):
+        if (i + 1) % 3 == 0 or (i + 1) == len(combos):
             print(f"    [{i+1}/{len(combos)}] best so far: {best_score:.4f}")
 
     return best_params, best_score
@@ -94,11 +117,16 @@ def main() -> None:
 
     # --- data ---
     print("\n[1/5] Loading data...")
-    X_train, X_test, y_train, y_test, feature_names, target_names = (
+    X_train, X_test, y_train, y_test, feature_names, target_names, scaler = (
         load_heart_disease_data()
     )
     input_dim = X_train.shape[1]
     print(f"  Features: {input_dim}  |  Train: {len(X_train)}  |  Test: {len(y_test)}")
+
+    # Save scaler for inference API
+    with open("models/scaler.pkl", "wb") as f:
+        pickle.dump(scaler, f)
+    print("  Scaler saved -> models/scaler.pkl")
 
     # Split train into train+val for DL early stopping
     from sklearn.model_selection import train_test_split
@@ -121,7 +149,7 @@ def main() -> None:
     print("\n[3/5] Hyperparameter tuning — TensorFlow MLP...")
     tf_best_hp, tf_best_cv = grid_search(
         X_train, y_train, TensorFlowMLP, input_dim, HP_SPACE,
-        n_folds=3, epochs=100, batch_size=32,
+        n_folds=2, epochs=40, batch_size=32,
     )
     print(f"  Best CV accuracy: {tf_best_cv:.4f}")
     print(f"  Best params: {tf_best_hp}")
@@ -143,7 +171,7 @@ def main() -> None:
     print("\n[4/5] Hyperparameter tuning — PyTorch MLP...")
     pt_best_hp, pt_best_cv = grid_search(
         X_train, y_train, PyTorchMLP, input_dim, HP_SPACE,
-        n_folds=3, epochs=100, batch_size=32,
+        n_folds=2, epochs=40, batch_size=32,
     )
     print(f"  Best CV accuracy: {pt_best_cv:.4f}")
     print(f"  Best params: {pt_best_hp}")
@@ -177,10 +205,13 @@ def main() -> None:
     print("  models/logreg.onnx")
     print("  models/tf_mlp.onnx")
     print("  models/pytorch_mlp.onnx")
+    print("  models/scaler.pkl")
     print("  models/comparison.csv")
     print("  models/best_hyperparameters.json")
     print("\nTensorBoard logs:")
     print("  tensorboard --logdir logs/")
+    print("\nFrontend:")
+    print("  python app.py  ->  http://localhost:5000")
     print("Done.")
 
 

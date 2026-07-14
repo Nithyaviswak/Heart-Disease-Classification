@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Heart Disease Risk Prediction using Machine Learning — Logistic Regression, TensorFlow MLP, and PyTorch MLP models.">
+    <title>Heart Disease Risk Predictor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800&family=Noto+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --font-heading: 'Figtree', -apple-system, sans-serif;
+            --font-body: 'Noto Sans', -apple-system, sans-serif;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        :root {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #f1f5f9;
+            --bg-card: #ffffff;
+            --bg-glass: rgba(30, 58, 95, 0.03);
+            --border: #e2e8f0;
+            --border-hover: #94a3b8;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --primary: #1e3a5f;
+            --primary-light: #2563eb;
+            --primary-glow: rgba(30, 58, 95, 0.2);
+            --accent: #059669;
+            --accent-glow: rgba(5, 150, 105, 0.2);
+            --success: #059669;
+            --success-glow: rgba(5, 150, 105, 0.15);
+            --danger: #dc2626;
+            --danger-glow: rgba(220, 38, 38, 0.15);
+            --warning: #d97706;
+            --gradient-1: linear-gradient(135deg, #1e3a5f, #2563eb, #059669);
+            --gradient-danger: linear-gradient(135deg, #dc2626, #f97316);
+            --gradient-success: linear-gradient(135deg, #059669, #0d9488);
+            --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-card: rgba(17, 24, 39, 0.85);
+            --bg-glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.06);
+            --border-hover: rgba(255, 255, 255, 0.12);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --primary: #3b82f6;
+            --primary-light: #60a5fa;
+            --primary-glow: rgba(59, 130, 246, 0.25);
+            --accent: #34d399;
+            --accent-glow: rgba(52, 211, 153, 0.2);
+            --success: #34d399;
+            --success-glow: rgba(52, 211, 153, 0.15);
+            --danger: #f87171;
+            --danger-glow: rgba(248, 113, 113, 0.15);
+            --warning: #fbbf24;
+            --gradient-1: linear-gradient(135deg, #2563eb, #3b82f6, #34d399);
+            --gradient-danger: linear-gradient(135deg, #f87171, #fb923c);
+            --gradient-success: linear-gradient(135deg, #34d399, #2dd4bf);
+            --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(ellipse at 20% 50%, rgba(30, 58, 95, 0.05) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 20%, rgba(5, 150, 105, 0.04) 0%, transparent 50%),
+                        radial-gradient(ellipse at 50% 80%, rgba(37, 99, 235, 0.03) 0%, transparent 50%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        [data-theme="dark"] body::before {
+            background: radial-gradient(ellipse at 20% 50%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 20%, rgba(52, 211, 153, 0.04) 0%, transparent 50%),
+                        radial-gradient(ellipse at 50% 80%, rgba(37, 99, 235, 0.03) 0%, transparent 50%);
+        }
+
+        .skip-link {
+            position: absolute;
+            top: -100%;
+            left: 1rem;
+            padding: 0.75rem 1.5rem;
+            background: var(--primary);
+            color: #fff;
+            border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+            font-size: 0.9rem;
+            font-weight: 600;
+            z-index: 1000;
+            text-decoration: none;
+        }
+        .skip-link:focus { top: 0; }
+
+        .app-container {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 4rem;
+        }
+
+        .hero {
+            text-align: center;
+            padding: 3rem 0 2.5rem;
+            position: relative;
+        }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 0.4rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--primary-light);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 1.5rem;
+            font-family: var(--font-heading);
+        }
+        .hero-badge svg { flex-shrink: 0; }
+        .hero h1 {
+            font-family: var(--font-heading);
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 800;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.15;
+            margin-bottom: 0.75rem;
+        }
+        .hero p {
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+            max-width: 520px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .theme-toggle {
+            position: absolute;
+            top: 1rem;
+            right: 0;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 0.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            width: 40px;
+            height: 40px;
+        }
+        .theme-toggle:hover {
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+        }
+        .theme-toggle:focus-visible {
+            outline: 3px solid var(--primary);
+            outline-offset: 2px;
+        }
+        .theme-toggle svg { width: 20px; height: 20px; }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            transition: var(--transition);
+        }
+        .card:hover { border-color: var(--border-hover); }
+        .card:focus-within { border-color: var(--primary); }
+
+        .card-header {
+            padding: 1.5rem 1.75rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .card-header .icon {
+            width: 40px; height: 40px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            display: grid;
+            place-items: center;
+            flex-shrink: 0;
+        }
+        .card-header .icon svg { width: 20px; height: 20px; color: var(--primary-light); }
+        .card-header h2 {
+            font-family: var(--font-heading);
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        .card-body { padding: 1.25rem 1.75rem 1.75rem; }
+
+        .grid-main {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 1.5rem;
+            align-items: start;
+        }
+        @media (max-width: 900px) {
+            .grid-main { grid-template-columns: 1fr; }
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+        .form-group label {
+            font-size: 0.72rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+        }
+        .form-group input {
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 0.65rem 0.85rem;
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: var(--transition);
+            outline: none;
+            -moz-appearance: textfield;
+        }
+        .form-group input::-webkit-outer-spin-button,
+        .form-group input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .form-group input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        .model-selector {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.25rem;
+        }
+        .model-btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 0.6rem 1rem;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-family: var(--font-body);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            text-align: center;
+        }
+        .model-btn:hover {
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+        }
+        .model-btn:focus-visible {
+            outline: 3px solid var(--primary);
+            outline-offset: 2px;
+        }
+        .model-btn.active {
+            background: rgba(30, 58, 95, 0.08);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        [data-theme="dark"] .model-btn.active {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: var(--primary);
+            color: var(--primary-light);
+        }
+
+        .btn-predict {
+            width: 100%;
+            margin-top: 1.25rem;
+            padding: 0.85rem;
+            background: var(--gradient-1);
+            border: none;
+            border-radius: var(--radius-sm);
+            color: #fff;
+            font-family: var(--font-heading);
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-predict:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 30px var(--primary-glow);
+        }
+        .btn-predict:active { transform: translateY(0); }
+        .btn-predict:focus-visible {
+            outline: 3px solid var(--primary);
+            outline-offset: 2px;
+        }
+        .btn-predict:disabled {
+            opacity: 0.6;
+            cursor: wait;
+            transform: none;
+        }
+        .btn-predict .spinner {
+            display: none;
+            width: 18px; height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .result-panel {
+            position: sticky;
+            top: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .diagnosis-card {
+            text-align: center;
+            padding: 2.5rem 1.75rem;
+            min-height: 240px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .diagnosis-card.waiting { border-style: dashed; }
+        .diagnosis-icon {
+            width: 72px; height: 72px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            margin-bottom: 1rem;
+            transition: var(--transition);
+        }
+        .diagnosis-icon.positive {
+            background: var(--danger-glow);
+            box-shadow: 0 0 40px var(--danger-glow);
+        }
+        .diagnosis-icon.negative {
+            background: var(--success-glow);
+            box-shadow: 0 0 40px var(--success-glow);
+        }
+        .diagnosis-icon svg { width: 32px; height: 32px; }
+        .diagnosis-label {
+            font-family: var(--font-heading);
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+        .diagnosis-sub {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .gauge-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1.5rem;
+        }
+        .gauge {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+        .gauge-fill {
+            height: 100%;
+            border-radius: 99px;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 0%;
+        }
+        .gauge-fill.low { background: var(--gradient-success); }
+        .gauge-fill.mid { background: linear-gradient(90deg, var(--warning), #f97316); }
+        .gauge-fill.high { background: var(--gradient-danger); }
+        .gauge-label {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .gauge-value {
+            font-size: 2rem;
+            font-weight: 800;
+            font-family: var(--font-heading);
+        }
+        .gauge-value.low { color: var(--success); }
+        .gauge-value.mid { color: var(--warning); }
+        .gauge-value.high { color: var(--danger); }
+
+        .comparison-section { margin-top: 2rem; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-size: 0.72rem;
+            font-weight: 600;
+            font-family: var(--font-heading);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+        tbody td {
+            padding: 0.75rem 1rem;
+            font-size: 0.9rem;
+            border-bottom: 1px solid var(--border);
+        }
+        tbody tr:hover { background: var(--bg-glass); }
+        .acc-badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        @keyframes fade-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .animate-in { animation: fade-up 0.5s ease-out forwards; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .animate-in { animation: none; opacity: 1; transform: none; }
+        }
+
+        .waiting-text { color: var(--text-muted); font-size: 0.95rem; }
+        .error-text {
+            color: var(--danger);
+            font-size: 0.9rem;
+            padding: 1rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <div class="app-container">
+        <header class="hero" role="banner">
+            <button class="theme-toggle" id="theme-toggle" aria-label="Toggle color theme" title="Toggle theme">
+                <svg id="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                <svg id="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+            <div class="hero-badge">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                ML-Powered Diagnosis
+            </div>
+            <h1>Heart Disease Risk Predictor</h1>
+            <p>Enter patient clinical data to receive an instant risk assessment powered by three machine learning models.</p>
+        </header>
+
+        <div class="grid-main" id="main-content" role="main">
+            <div class="card" id="form-card">
+                <div class="card-header">
+                    <div class="icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    </div>
+                    <h2>Patient Clinical Data</h2>
+                </div>
+                <div class="card-body">
+                    <div class="model-selector" id="model-selector" role="radiogroup" aria-label="Select prediction model">
+                        {% for key, label in models.items() %}
+                        <button class="model-btn {% if loop.first %}active{% endif %}" data-model="{{ key }}" id="btn-model-{{ key }}" role="radio" aria-checked="{% if loop.first %}true{% else %}false{% endif %}">
+                            {{ label }}
+                        </button>
+                        {% endfor %}
+                        {% if not models %}
+                        <div class="error-text">No trained models found. Run <code>python train.py</code> first.</div>
+                        {% endif %}
+                    </div>
+
+                    <form id="predict-form" novalidate>
+                        <div class="form-grid">
+                            {% for f in features %}
+                            <div class="form-group">
+                                <label for="input-{{ f.name }}">{{ f.label }}</label>
+                                <input type="number" id="input-{{ f.name }}" name="{{ f.name }}"
+                                       min="{{ f.min }}" max="{{ f.max }}" step="{{ f.step }}"
+                                       value="{{ f.default }}" required
+                                       aria-required="true">
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="submit" class="btn-predict" id="btn-predict" {% if not models %}disabled{% endif %} aria-busy="false">
+                            <span class="btn-text">Analyze Risk</span>
+                            <div class="spinner" id="spinner"></div>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="result-panel" aria-label="Prediction results">
+                <div class="card diagnosis-card waiting" id="diagnosis-card" role="status" aria-live="polite">
+                    <p class="waiting-text">Enter patient data and click <strong>Analyze Risk</strong></p>
+                </div>
+
+                <div class="card" id="gauge-card" style="display: none;" aria-hidden="true">
+                    <div class="card-header">
+                        <div class="icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+                        </div>
+                        <h2>Risk Score</h2>
+                    </div>
+                    <div class="gauge-wrapper">
+                        <div class="gauge-value" id="gauge-value">&mdash;</div>
+                        <div class="gauge" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" id="gauge-progress" aria-label="Risk percentage">
+                            <div class="gauge-fill" id="gauge-fill"></div>
+                        </div>
+                        <div class="gauge-label">
+                            <span>Low Risk</span>
+                            <span>High Risk</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if comparison %}
+        <section class="comparison-section" aria-label="Model comparison table">
+            <div class="card">
+                <div class="card-header">
+                    <div class="icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    </div>
+                    <h2>Model Comparison (Test Set)</h2>
+                </div>
+                <div class="card-body">
+                    <div class="table-wrap">
+                        <table>
+                            <caption style="caption-side: bottom; font-size: 0.75rem; color: var(--text-muted); padding-top: 0.5rem;">Accuracy comparison across trained models</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Model</th>
+                                    <th scope="col">Accuracy</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in comparison %}
+                                <tr>
+                                    <td>{{ row.Model }}</td>
+                                    <td>
+                                        <span class="acc-badge" style="background: var(--primary-glow); color: var(--primary);">
+                                            {{ row.Accuracy }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+
+        <footer class="footer" role="contentinfo">
+            Heart Disease Classification &mdash; UCI Heart-Statlog Dataset &mdash; For educational purposes only
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const themeToggle = document.getElementById('theme-toggle');
+            const html = document.documentElement;
+            const stored = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = stored || (prefersDark ? 'dark' : 'light');
+            html.setAttribute('data-theme', theme);
+            updateThemeIcons(theme);
+
+            themeToggle.addEventListener('click', () => {
+                const current = html.getAttribute('data-theme');
+                const next = current === 'dark' ? 'light' : 'dark';
+                html.setAttribute('data-theme', next);
+                localStorage.setItem('theme', next);
+                updateThemeIcons(next);
+            });
+
+            function updateThemeIcons(t) {
+                const sun = document.getElementById('theme-icon-sun');
+                const moon = document.getElementById('theme-icon-moon');
+                sun.style.display = t === 'dark' ? 'none' : 'block';
+                moon.style.display = t === 'dark' ? 'block' : 'none';
+            }
+
+            let selectedModel = document.querySelector('.model-btn.active')?.dataset.model || '';
+            document.querySelectorAll('.model-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.model-btn').forEach(b => {
+                        b.classList.remove('active');
+                        b.setAttribute('aria-checked', 'false');
+                    });
+                    btn.classList.add('active');
+                    btn.setAttribute('aria-checked', 'true');
+                    selectedModel = btn.dataset.model;
+                });
+            });
+
+            const form = document.getElementById('predict-form');
+            const btnPredict = document.getElementById('btn-predict');
+            const spinner = document.getElementById('spinner');
+            const btnText = document.querySelector('.btn-text');
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!selectedModel) return;
+
+                btnPredict.disabled = true;
+                btnPredict.setAttribute('aria-busy', 'true');
+                btnText.style.display = 'none';
+                spinner.style.display = 'block';
+
+                const features = {};
+                {% for f in features %}
+                features['{{ f.name }}'] = parseFloat(document.getElementById('input-{{ f.name }}').value);
+                {% endfor %}
+
+                try {
+                    const res = await fetch('/predict', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ model: selectedModel, features }),
+                    });
+                    const data = await res.json();
+
+                    if (data.error) {
+                        showError(data.error);
+                    } else {
+                        showResult(data);
+                    }
+                } catch (err) {
+                    showError('Network error. Is the server running?');
+                } finally {
+                    btnPredict.disabled = false;
+                    btnPredict.setAttribute('aria-busy', 'false');
+                    btnText.style.display = 'inline';
+                    spinner.style.display = 'none';
+                }
+            });
+
+            function showResult(data) {
+                const card = document.getElementById('diagnosis-card');
+                const gaugeCard = document.getElementById('gauge-card');
+                const isPositive = data.prediction === 1;
+
+                card.classList.remove('waiting');
+                card.classList.add('animate-in');
+
+                const iconSvg = isPositive
+                    ? '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+                    : '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+
+                card.innerHTML = `
+                    <div class="diagnosis-icon ${isPositive ? 'positive' : 'negative'}" aria-hidden="true">
+                        ${iconSvg}
+                    </div>
+                    <div class="diagnosis-label" style="color: var(${isPositive ? '--danger' : '--success'})">
+                        ${data.label}
+                    </div>
+                    <div class="diagnosis-sub">
+                        Confidence: ${data.confidence}% &middot; ${data.model}
+                    </div>
+                `;
+
+                gaugeCard.style.display = 'block';
+                gaugeCard.removeAttribute('aria-hidden');
+                const risk = data.risk_score;
+                const gaugeValue = document.getElementById('gauge-value');
+                const gaugeFill = document.getElementById('gauge-fill');
+                const gaugeProgress = document.getElementById('gauge-progress');
+
+                gaugeValue.textContent = risk + '%';
+                gaugeFill.style.width = risk + '%';
+                gaugeProgress.setAttribute('aria-valuenow', risk);
+
+                let level = 'low';
+                if (risk > 60) level = 'high';
+                else if (risk > 35) level = 'mid';
+
+                gaugeValue.className = 'gauge-value ' + level;
+                gaugeFill.className = 'gauge-fill ' + level;
+            }
+
+            function showError(msg) {
+                const card = document.getElementById('diagnosis-card');
+                card.classList.remove('waiting');
+                const gaugeCard = document.getElementById('gauge-card');
+                gaugeCard.style.display = 'none';
+                gaugeCard.setAttribute('aria-hidden', 'true');
+                card.innerHTML = `<div class="error-text" role="alert">${msg}</div>`;
+            }
+        });
+    </script>
+</body>
+</html>
