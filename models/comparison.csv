@@ -1,0 +1,4 @@
+Model,Accuracy
+Logistic Regression,0.8033
+TensorFlow MLP,0.7705
+PyTorch MLP,0.8197
