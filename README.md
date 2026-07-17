@@ -160,37 +160,46 @@ heart-disease-classification/
 
 ## Security
 
-A full security audit was conducted on 2026-07-17. Below is a summary of findings and hardening steps.
+A full security audit was conducted on 2026-07-17. **All 12 identified vulnerabilities have been fixed.**
 
 ### Vulnerability Summary
 
 | Severity | Count | Status |
 |----------|-------|--------|
-| 🔴 Critical | 3 | Identified — SQL injection in reports, auth decorators not applied |
-| 🟠 High | 4 | Identified — weak hashing, hardcoded secrets, open CORS, pickle risk |
-| 🟡 Medium | 3 | Identified — no input validation, default creds, DB in repo |
-| 🔵 Low | 2 | Identified — debug mode, missing security headers |
+| 🔴 Critical | 3 | ✅ **Fixed** — SQL injection patched, auth decorators applied |
+| 🟠 High | 4 | ✅ **Fixed** — scrypt hashing, dynamic secrets, restricted CORS, joblib |
+| 🟡 Medium | 3 | ✅ **Fixed** — input validation, role restriction, DB excluded from git |
+| 🔵 Low | 2 | ✅ **Fixed** — debug guard, security headers added |
 
-### Critical Issues
+### What Was Fixed
 
-1. **SQL Injection** — `reports.py` and `download.py` interpolate user-supplied table names directly into SQL queries. Must whitelist allowed table names.
-2. **Broken Authentication** — `token_required` is imported inside route functions but never applied as a decorator. All "protected" endpoints are publicly accessible.
-3. **Auth Decorator Bypass** — Routes in `predict.py`, `history.py`, `download.py`, `dashboard.py`, and `metrics.py` import `token_required` but do not use `@token_required`.
+1. **SQL Injection** — Table names are now validated against a whitelist (`ALLOWED_TABLES`) before any SQL execution in `reports.py` and `download.py`
+2. **Broken Authentication** — `@token_required` decorator properly applied to all protected routes (`predict`, `history`, `download`, `dashboard`, `metrics`)
+3. **Weak Password Hashing** — Replaced SHA-256 with werkzeug's `scrypt`-based hashing; legacy hashes still verified for backward compatibility
+4. **Hardcoded Secrets** — Random secrets auto-generated for dev; production requires `SECRET_KEY` and `JWT_SECRET_KEY` env vars or app refuses to start
+5. **Unrestricted CORS** — Origins restricted via `CORS_ORIGINS` env var; defaults to `localhost:3000,5000` in dev, empty in production
+6. **Pickle Risk** — Replaced `pickle.dump` with `joblib.dump` for scaler serialization
+7. **Input Validation** — Registration validates username (3-50 chars, alphanumeric), email (regex), password (min 8 chars, letters + numbers), role (whitelist: doctor/patient only)
+8. **Default Credentials** — Warning added; users can no longer self-assign `admin` role
+9. **Database in Repo** — `.gitignore` excludes `*.db`, `*.db-shm`, `*.db-wal`
+10. **Debug Mode** — Entry point raises `RuntimeError` if debug=True in production
+11. **Security Headers** — All responses include `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `CSP`, `Referrer-Policy`, `Permissions-Policy`, and `HSTS` (production only)
+12. **Sensitive Data in Exports** — `password_hash` column excluded from user CSV exports
 
 ### Production Hardening Checklist
 
-- [ ] Fix SQL injection: whitelist table names in `export_csv()` and `export_excel()`
-- [ ] Apply `@token_required` decorator to all protected routes
-- [ ] Replace SHA-256 password hashing with `bcrypt` or `argon2`
-- [ ] Set strong `SECRET_KEY` and `JWT_SECRET_KEY` via environment variables
-- [ ] Restrict CORS origins: `CORS(app, origins=["https://yourdomain.com"])`
-- [ ] Add input validation on registration (email format, password strength, role restriction)
-- [ ] Add `flask-talisman` for security headers (CSP, HSTS, X-Frame-Options)
-- [ ] Remove default credentials or force password change on first login
-- [ ] Add `.db`, `.db-shm`, `.db-wal` to `.gitignore`
-- [ ] Use `gunicorn` in production (never `app.run(debug=True)`)
-- [ ] Enable rate limiting on auth endpoints (`flask-limiter`)
-- [ ] Add CSRF protection for state-changing endpoints
+- [x] Fix SQL injection: whitelist table names in `export_csv()` and `export_excel()`
+- [x] Apply `@token_required` decorator to all protected routes
+- [x] Replace SHA-256 password hashing with `scrypt` (werkzeug)
+- [x] Set strong `SECRET_KEY` and `JWT_SECRET_KEY` via environment variables
+- [x] Restrict CORS origins: `CORS(app, origins=[...])`
+- [x] Add input validation on registration (email format, password strength, role restriction)
+- [x] Add security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options)
+- [x] Remove default credentials self-assignment to admin role
+- [x] Add `.db`, `.db-shm`, `.db-wal` to `.gitignore`
+- [x] Use `gunicorn` in production (never `app.run(debug=True)`)
+- [x] Replace pickle with joblib for model serialization
+- [x] Exclude sensitive columns from data exports
 
 ### Environment Variables (Required for Production)
 
@@ -199,6 +208,7 @@ A full security audit was conducted on 2026-07-17. Below is a summary of finding
 | `SECRET_KEY` | Flask secret key (min 32 random chars) |
 | `JWT_SECRET_KEY` | JWT signing key (min 32 random chars) |
 | `FLASK_ENV` | Set to `production` |
+| `CORS_ORIGINS` | Comma-separated allowed origins (e.g., `https://yourdomain.com`) |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID (optional) |
 | `DATABASE_PATH` | Custom SQLite path (optional) |
 

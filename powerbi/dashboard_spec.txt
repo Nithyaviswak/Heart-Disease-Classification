@@ -1,0 +1,306 @@
+/* Phase 5 & 6: Power BI Dashboard Layout Specification
+   This file documents the complete Power BI dashboard structure.
+   Import the CSV datasets from analytics/ into Power BI.
+*/
+
+/*
+============================================================
+  POWER BI DASHBOARD — HEART DISEASE ANALYTICS PLATFORM
+============================================================
+
+DATASETS (import from analytics/ folder):
+  - patients.csv        (patient demographics + predictions)
+  - model_metrics.csv   (model performance comparison)
+  - predictions.csv     (prediction history)
+  - age_buckets.csv     (age group distributions)
+  - correlation_matrix.csv (feature correlations)
+
+============================================================
+  REPORT STRUCTURE (6 pages)
+============================================================
+
+PAGE 1: EXECUTIVE DASHBOARD
+----------------------------------------------------------
+  KPIs (Card visuals):
+    - Total Patients
+    - Average Age
+    - Heart Disease %
+    - High Risk Patients
+    - Model Accuracy (best)
+    - Avg Confidence
+
+  Charts:
+    - Donut: Risk Distribution (High vs Low Risk)
+    - KPI trend: Predictions Over Time (line chart)
+    - Gauge: Model Accuracy (best model)
+
+  Slicers:
+    - Date range
+    - Model name
+
+PAGE 2: PATIENT DEMOGRAPHICS
+----------------------------------------------------------
+  Charts:
+    - Stacked Bar: Age Distribution by Risk
+    - Clustered Bar: Gender Distribution
+    - Column: Chest Pain Type Distribution
+    - Histogram: Blood Pressure Distribution
+    - Histogram: Cholesterol Distribution
+
+  Slicers:
+    - Sex (checkbox)
+    - Age group
+    - Chest Pain type
+
+  Drill-through: From patient chart to individual predictions
+
+PAGE 3: DISEASE ANALYSIS
+----------------------------------------------------------
+  Charts:
+    - Ribbon Chart: Disease by Age
+    - Stacked Bar: Disease by Sex
+    - Clustered Bar: Disease by Chest Pain Type
+    - Column: Disease by Fasting Blood Sugar
+    - Heatmap: Correlation Matrix
+    - Scatter: Age vs Max Heart Rate (colored by disease)
+
+  Tooltips:
+    - Dynamic tooltip showing patient count and disease %
+
+PAGE 4: PREDICTION ANALYTICS
+----------------------------------------------------------
+  Charts:
+    - Table: High Risk Patients (sorted by probability)
+    - Bar: Model Confidence Comparison
+    - KPI: Predictions Today
+    - Line: Daily Prediction Trends (30 days)
+    - Bar: Model Performance (accuracy, precision, recall)
+
+  Bookmark: Toggle between confusion matrix and ROC curve
+
+PAGE 5: MODEL PERFORMANCE
+----------------------------------------------------------
+  Charts:
+    - Tornado: Model Accuracy Comparison
+    - Table: Full metrics (Accuracy, Precision, Recall, F1, ROC AUC)
+    - Bar: Feature Importance (from SHAP data)
+    - Slicer: Select model to highlight
+
+  Navigation: Buttons to switch between pages
+
+PAGE 6: TIME INTELLIGENCE
+----------------------------------------------------------
+  Charts:
+    - Line: Daily Predictions
+    - Line: 7-Day Rolling Average
+    - Line: Monthly Trends
+    - Column: Predictions by Day of Week
+    - Area: Cumulative Predictions
+
+  Slicers:
+    - Month/Year hierarchy
+    - Weekday filter
+
+============================================================
+  DAX MEASURES
+============================================================
+
+-- Patient Metrics
+Total Patients = COUNTROWS(patients)
+
+Avg Age = AVERAGE(patients[age])
+
+Disease Rate = DIVIDE(
+    COUNTROWS(FILTER(patients, patients[prediction] = 1)),
+    COUNTROWS(patients)
+)
+
+High Risk Pct = DIVIDE(
+    COUNTROWS(FILTER(patients, patients[risk_score] > 70)),
+    COUNTROWS(patients)
+)
+
+-- Gender Analysis
+Male Patients = COUNTROWS(FILTER(patients, patients[sex] = 1))
+Female Patients = COUNTROWS(FILTER(patients, patients[sex] = 0))
+Male Disease Rate = DIVIDE(
+    COUNTROWS(FILTER(patients, patients[sex] = 1 && patients[prediction] = 1)),
+    COUNTROWS(FILTER(patients, patients[sex] = 1))
+)
+Female Disease Rate = DIVIDE(
+    COUNTROWS(FILTER(patients, patients[sex] = 0 && patients[prediction] = 1)),
+    COUNTROWS(FILTER(patients, patients[sex] = 0))
+)
+
+-- Age Buckets
+Age Group = SWITCH(
+    TRUE(),
+    patients[age] < 30, "<30",
+    patients[age] < 40, "30-39",
+    patients[age] < 50, "40-49",
+    patients[age] < 60, "50-59",
+    patients[age] < 70, "60-69",
+    "70+"
+)
+
+-- Model Performance  
+Best Accuracy = MAXX(model_metrics, model_metrics[accuracy])
+Best Model = LOOKUPVALUE(
+    model_metrics[model_name],
+    model_metrics[accuracy], [Best Accuracy]
+)
+
+Avg Confidence = AVERAGE(predictions[confidence])
+
+-- Time Intelligence
+Predictions Today = CALCULATE(
+    COUNTROWS(predictions),
+    predictions[created_at] = TODAY()
+)
+
+Predictions MTD = TOTALMTD(
+    COUNTROWS(predictions),
+    predictions[created_at]
+)
+
+Predictions vs Previous Month = 
+    VAR CurrentMonth = COUNTROWS(predictions)
+    VAR PrevMonth = CALCULATE(
+        COUNTROWS(predictions),
+        PREVIOUSMONTH(predictions[created_at])
+    )
+    RETURN DIVIDE(CurrentMonth - PrevMonth, PrevMonth)
+
+7-Day Rolling Avg = 
+    CALCULATE(
+        AVERAGEX(
+            FILTER(
+                ALL(predictions[created_at]),
+                predictions[created_at] <= MAX(predictions[created_at]) &&
+                predictions[created_at] > MAX(predictions[created_at]) - 7
+            ),
+            COUNTROWS(predictions)
+        )
+    )
+
+-- Risk Classification
+Risk Level = SWITCH(
+    TRUE(),
+    patients[risk_score] >= 70, "High Risk",
+    patients[risk_score] >= 40, "Moderate Risk",
+    "Low Risk"
+)
+
+============================================================
+  POWER QUERY TRANSFORMATIONS (M Language)
+============================================================
+
+// 1. Load patients.csv
+let
+    Source = Csv.Document(
+        File.Contents("analytics/patients.csv"),
+        [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]
+    ),
+    #"Promoted Headers" = Table.PromoteHeaders(Source, [PromoteAllScalars=true]),
+    #"Changed Type" = Table.TransformColumnTypes(#"Promoted Headers", {
+        {"age", Int64.Type}, {"sex", Int64.Type}, {"cp", Int64.Type},
+        {"trestbps", Int64.Type}, {"chol", Int64.Type}, {"fbs", Int64.Type},
+        {"restecg", Int64.Type}, {"thalach", Int64.Type}, {"exang", Int64.Type},
+        {"oldpeak", type number}, {"slope", Int64.Type}, {"ca", Int64.Type},
+        {"thal", Int64.Type}, {"prediction", Int64.Type}, {"probability", type number},
+        {"risk_score", type number}, {"created_at", type datetime}
+    }),
+    #"Added Age Group" = Table.AddColumn(#"Changed Type", "Age Group", each
+        if [age] < 30 then "<30"
+        else if [age] < 40 then "30-39"
+        else if [age] < 50 then "40-49"
+        else if [age] < 60 then "50-59"
+        else if [age] < 70 then "60-69"
+        else "70+"
+    ),
+    #"Added Gender Label" = Table.AddColumn(#"Added Age Group", "Gender", each
+        if [sex] = 1 then "Male" else "Female"
+    ),
+    #"Added Risk Level" = Table.AddColumn(#"Added Gender Label", "Risk Level", each
+        if [risk_score] >= 70 then "High Risk"
+        else if [risk_score] >= 40 then "Moderate Risk"
+        else "Low Risk"
+    ),
+    #"Reordered Columns" = Table.ReorderColumns(#"Added Risk Level", {
+        "prediction_id", "age", "Age Group", "sex", "Gender", "cp",
+        "trestbps", "chol", "fbs", "restecg", "thalach", "exang",
+        "oldpeak", "slope", "ca", "thal", "prediction", "probability",
+        "risk_score", "Risk Level", "model_name", "created_at"
+    })
+in
+    #"Reordered Columns"
+
+// 2. Create Date dimension table
+let
+    Source = Table.FromList(
+        List.Dates(#date(2024,1,1), 730, #duration(1,0,0,0)),
+        Splitter.SplitByNothing()
+    ),
+    #"Renamed" = Table.RenameColumns(Source,{{"Column1", "Date"}}),
+    #"Changed Type" = Table.TransformColumnTypes(#"Renamed",{{"Date", type date}}),
+    #"Added Year" = Table.AddColumn(#"Changed Type", "Year", each Date.Year([Date])),
+    #"Added Month" = Table.AddColumn(#"Added Year", "Month", each Date.Month([Date])),
+    #"Added Month Name" = Table.AddColumn(#"Added Month", "Month Name", each Date.MonthName([Date])),
+    #"Added Quarter" = Table.AddColumn(#"Added Month Name", "Quarter", each Date.QuarterOfYear([Date])),
+    #"Added Day of Week" = Table.AddColumn(#"Added Quarter", "Day of Week", each Date.DayOfWeek([Date])),
+    #"Added Day Name" = Table.AddColumn(#"Added Day of Week", "Day Name", each Date.DayOfWeekName([Date])),
+    #"Added Week Ending" = Table.AddColumn(#"Added Day Name", "Week Ending", each Date.EndOfWeek([Date])),
+    #"Added Year-Month" = Table.AddColumn(#"Added Week Ending", "Year-Month", each [Year] * 100 + [Month])
+in
+    #"Added Year-Month"
+
+============================================================
+  RELATIONSHIPS
+============================================================
+
+  patients[created_at]   -> Date[Date]              (Many-to-1)
+  predictions[created_at] -> Date[Date]             (Many-to-1)
+  predictions[model_name] -> model_metrics[model_name] (Many-to-1)
+
+============================================================
+  BOOKMARKS
+============================================================
+
+  1. "Confusion Matrix View"  — Shows confusion matrix visual
+  2. "ROC Curve View"         — Shows ROC curve visual
+  3. "Weekly View"            — Weekly aggregation
+  4. "Monthly View"           — Monthly aggregation
+
+============================================================
+  NAVIGATION BUTTONS
+============================================================
+
+  Button: "Executive Dashboard"  -> Page 1
+  Button: "Patient Demographics" -> Page 2
+  Button: "Disease Analysis"     -> Page 3
+  Button: "Prediction Analytics" -> Page 4
+  Button: "Model Performance"    -> Page 5
+  Button: "Time Intelligence"    -> Page 6
+
+============================================================
+  THEME (Professional Healthcare)
+============================================================
+
+  Colors:
+    Primary:    #1E3A5F (Navy)
+    Secondary:  #2563EB (Blue)
+    Accent:     #059669 (Green)
+    Danger:     #DC2626 (Red)
+    Warning:    #D97706 (Amber)
+    Background: #F8FAFC
+    Card BG:    #FFFFFF
+    Text:       #0F172A
+
+  Font: Segoe UI (default)
+
+  Visual styles:
+    - Rounded corners (4px)
+    - Clean borders
+    - Consistent padding
+    - Minimal gridlines
+*/

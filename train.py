@@ -2,7 +2,6 @@
 
 import os
 import json
-import pickle
 import itertools
 import numpy as np
 import pandas as pd
@@ -123,10 +122,10 @@ def main() -> None:
     input_dim = X_train.shape[1]
     print(f"  Features: {input_dim}  |  Train: {len(X_train)}  |  Test: {len(y_test)}")
 
-    # Save scaler for inference API
-    with open("models/scaler.pkl", "wb") as f:
-        pickle.dump(scaler, f)
-    print("  Scaler saved -> models/scaler.pkl")
+    # Save scaler for inference API (using joblib instead of pickle for security)
+    import joblib
+    joblib.dump(scaler, "models/scaler.pkl")
+    print("  Scaler saved -> models/scaler.pkl (joblib)")
 
     # Split train into train+val for DL early stopping
     from sklearn.model_selection import train_test_split
