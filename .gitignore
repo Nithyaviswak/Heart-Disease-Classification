@@ -3,3 +3,26 @@ __pycache__/
 logs/
 temp_saved_model/
 .DS_Store
+
+# Environment files
+.env
+.env.example    
+
+# IDE / agent config
+.opencode
+.claude 
+
+# Database files (contain user data)
+*.db
+*.db-shm
+*.db-wal
+
+# Build artifacts
+frontend/node_modules/
+frontend/dist/
+
+# Generated reports (may contain PII)
+reports/*.pdf
+reports/*.html
+reports/*.xlsx
+reports/*.csv
